@@ -13,25 +13,32 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
+import org.springframework.boot.autoconfigure.thread.Threading;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.task.SimpleAsyncTaskExecutorBuilder;
+import org.springframework.boot.task.SimpleAsyncTaskSchedulerBuilder;
 import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static org.springframework.scheduling.annotation.AsyncAnnotationBeanPostProcessor.DEFAULT_TASK_EXECUTOR_BEAN_NAME;
+import static org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor.DEFAULT_TASK_SCHEDULER_BEAN_NAME;
 
 @AutoConfiguration(after = {TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class})
 @ConditionalOnProperty(prefix = "outbox", name = "enabled", matchIfMissing = true)
@@ -57,9 +64,22 @@ public class OutboxAutoConfiguration {
         return new OutboxQueueProcessorImpl(properties, taskExecutor, invoker, repository, observability);
     }
 
+    @Bean(DEFAULT_TASK_EXECUTOR_BEAN_NAME)
+    @ConditionalOnMissingBean(name = DEFAULT_TASK_EXECUTOR_BEAN_NAME)
+    @ConditionalOnThreading(Threading.VIRTUAL)
+    public SimpleAsyncTaskExecutor virtualApplicationTaskExecutor(SimpleAsyncTaskExecutorBuilder builder) {
+        return builder.build();
+    }
+
+    @Bean(DEFAULT_TASK_EXECUTOR_BEAN_NAME)
+    @ConditionalOnMissingBean(name = DEFAULT_TASK_EXECUTOR_BEAN_NAME)
+    @ConditionalOnThreading(Threading.PLATFORM)
+    public ThreadPoolTaskExecutor platformApplicationTaskExecutor(ThreadPoolTaskExecutorBuilder builder) {
+        return builder.build();
+    }
+
     @Bean(WORKER_EXECUTOR_BEAN_NAME)
     @ConditionalOnMissingBean(name = WORKER_EXECUTOR_BEAN_NAME)
-    @DependsOn(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
     public AsyncTaskExecutor outboxWorkerExecutor(
             OutboxProperties properties,
             ThreadPoolTaskExecutorBuilder builder) {
@@ -120,9 +140,23 @@ public class OutboxAutoConfiguration {
         return new OutboxSchemaInitializer(jdbcTemplate);
     }
 
+    @Bean(DEFAULT_TASK_SCHEDULER_BEAN_NAME)
+    @ConditionalOnMissingBean(name = DEFAULT_TASK_SCHEDULER_BEAN_NAME)
+    @ConditionalOnThreading(Threading.VIRTUAL)
+    public SimpleAsyncTaskScheduler virtualTaskScheduler(SimpleAsyncTaskSchedulerBuilder builder) {
+        return builder.build();
+    }
+
+    @Bean(DEFAULT_TASK_SCHEDULER_BEAN_NAME)
+    @ConditionalOnMissingBean(name = DEFAULT_TASK_SCHEDULER_BEAN_NAME)
+    @ConditionalOnThreading(Threading.PLATFORM)
+    public ThreadPoolTaskScheduler platformTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
+        return builder.build();
+    }
+
     @Bean(OUTBOX_SCHEDULER_BEAN_NAME)
     @ConditionalOnMissingBean(name = OUTBOX_SCHEDULER_BEAN_NAME)
-    @DependsOn("taskScheduler")
+    @DependsOn(DEFAULT_TASK_SCHEDULER_BEAN_NAME)
     public ThreadPoolTaskScheduler outboxScheduler(
             OutboxProperties outboxProperties,
             ThreadPoolTaskSchedulerBuilder builder) {
