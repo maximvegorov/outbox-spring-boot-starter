@@ -22,7 +22,6 @@ import static org.mockito.Mockito.*;
 class DefaultOutboxServiceTest {
     @Mock
     OutboxQueueProcessor queueProcessor;
-
     @InjectMocks
     DefaultOutboxService service;
 
