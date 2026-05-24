@@ -89,7 +89,7 @@ public class OutboxProperties {
     public static class CleanerConfig {
         private boolean enabled = false;
         @NotNull
-        private Duration retentionPeriod = Duration.ofDays(7);
+        private Duration retentionPeriod = Duration.ofDays(30);
         @Positive
         private int batchSize = 10_000;
         @NotNull
