@@ -15,7 +15,7 @@ public record OutboxMessage(
         String payloadKey,
         @NonNull
         String payload,
-        int retryCount,
+        int failedAttempts,
         @NonNull
         Instant createdAt,
         Instant expiredAt,

@@ -1,6 +1,8 @@
 package io.github.maximvegorov.outbox;
 
+import io.github.maximvegorov.outbox.utils.BackoffTimeoutCalculator;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -26,10 +28,13 @@ public class OutboxProperties {
 
     @NotNull
     @Valid
-    private PollerConfig poller = new PollerConfig();
+    private SchedulerConfig scheduler = new SchedulerConfig();
     @NotNull
     @Valid
     private WorkerConfig worker = new WorkerConfig();
+    @NotNull
+    @Valid
+    private CleanerConfig cleaner = new CleanerConfig();
     @NotNull
     @Valid
     private HandlerConfig defaults = new HandlerConfig();
@@ -37,23 +42,26 @@ public class OutboxProperties {
     @Valid
     private Map<@NotEmpty String, @NotNull @Valid HandlerConfig> handlers = new HashMap<>();
 
-    public int maxRetriesFor(String handlerType) {
+    public int maxAttemptsFor(String handlerType) {
         return Optional.ofNullable(handlers.get(handlerType))
-                .map(HandlerConfig::getMaxRetries)
-                .orElse(defaults.getMaxRetries());
+                .map(HandlerConfig::getMaxAttempts)
+                .orElse(defaults.getMaxAttempts());
     }
 
-    public Instant expiredAtFor(String handlerType, Instant now) {
-        var timeout = Optional.ofNullable(handlers.get(handlerType))
-                .map(HandlerConfig::getTimeout)
-                .orElse(defaults.getTimeout());
+    public Instant expiredAtFor(String handlerType, Instant now, int failedAttempts) {
+        var handlerConfig = Optional.ofNullable(handlers.get(handlerType))
+                .orElse(defaults);
+        var maxTimeout = handlerConfig.getMaxTimeout();
+        var timeout0 = handlerConfig.getTimeout();
+        var multiplier = handlerConfig.getMultiplier();
+        var timeout = BackoffTimeoutCalculator.calc(timeout0, failedAttempts, multiplier, maxTimeout);
         return now.plus(timeout);
     }
 
     @Data
-    public static class PollerConfig {
+    public static class SchedulerConfig {
         @NotEmpty
-        private String threadNamePrefix = "outbox-poll-";
+        private String threadNamePrefix = "outbox-scheduler-";
         private boolean awaitTermination = true;
         @NotNull
         private Duration terminationTimeout = Duration.ofSeconds(30);
@@ -78,10 +86,26 @@ public class OutboxProperties {
     }
 
     @Data
+    public static class CleanerConfig {
+        private boolean enabled = false;
+        @NotNull
+        private Duration retentionPeriod = Duration.ofDays(7);
+        @Positive
+        private int batchSize = 10_000;
+        @NotNull
+        private Duration runInterval = Duration.ofDays(1);
+    }
+
+    @Data
     public static class HandlerConfig {
         @Positive
-        private int maxRetries = 3;
+        private int maxAttempts = 5;
         @NotNull
         private Duration timeout = Duration.ofSeconds(30);
+        @Positive
+        @DecimalMin("1.0")
+        private double multiplier = 1.5;
+        @NotNull
+        private Duration maxTimeout = Duration.ofMinutes(5);
     }
 }
