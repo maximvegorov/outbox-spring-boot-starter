@@ -17,10 +17,15 @@ import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfigurati
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.github.maximvegorov.outbox.internal.OutboxMetricsImpl;
+import io.github.maximvegorov.outbox.internal.OutboxMetrics;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -47,8 +52,16 @@ public class OutboxAutoConfiguration {
             OutboxProperties properties,
             @Qualifier(WORKER_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
             OutboxHandlerInvoker invoker,
-            OutboxRepository repository) {
-        return new OutboxQueueProcessorImpl(properties, taskExecutor, invoker, repository);
+            OutboxRepository repository,
+            ObjectProvider<OutboxMetrics> metrics) {
+        return new OutboxQueueProcessorImpl(properties, taskExecutor, invoker, repository,
+                metrics.getIfAvailable(() -> OutboxMetrics.NOOP));
+    }
+
+    @Bean
+    @ConditionalOnBean(MeterRegistry.class)
+    public OutboxMetrics outboxMetrics(MeterRegistry meterRegistry) {
+        return new OutboxMetricsImpl(meterRegistry);
     }
 
     @Bean(WORKER_EXECUTOR_BEAN_NAME)
