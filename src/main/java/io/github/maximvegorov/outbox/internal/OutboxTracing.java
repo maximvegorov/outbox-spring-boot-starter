@@ -9,9 +9,11 @@ public interface OutboxTracing {
     @NonNull
     Runnable restoreContext(@Nullable String tracingContext);
 
+    Runnable NOOP_CLEANUP = () -> {};
+
     OutboxTracing NOOP = new OutboxTracing() {
         public String captureContext() { return null; }
         @NonNull
-        public Runnable restoreContext(String ctx) { return () -> {}; }
+        public Runnable restoreContext(String ctx) { return NOOP_CLEANUP; }
     };
 }

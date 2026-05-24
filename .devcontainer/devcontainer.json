@@ -1,0 +1,22 @@
+{
+  "name": "Java 25 + Maven + Claude Code",
+  "build": {
+    "dockerfile": "Containerfile",
+    "context": "."
+  },
+  "forwardPorts": [8080],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  "runArgs": [
+    "--cap-add=SYS_PTRACE"
+  ]
+}

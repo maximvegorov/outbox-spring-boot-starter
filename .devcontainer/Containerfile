@@ -1,0 +1,28 @@
+FROM docker.io/ubuntu:26.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        xz-utils \
+        git \
+        openssh-client \
+        openjdk-25-jdk-headless \
+        maven && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    mv /root/.local/bin/uv /usr/local/bin/uv && \
+    mv /root/.local/bin/uvx /usr/local/bin/uvx && \
+    uv --version && \
+    uvx --version
+
+RUN curl -fsSL https://nodejs.org/dist/v24.15.0/node-v24.15.0-linux-x64.tar.xz \
+    | tar -xJ -C /usr/local --strip-components=1 && \
+    node -v && \
+    npm -v
+
+RUN curl -fsSL https://claude.ai/install.sh | bash

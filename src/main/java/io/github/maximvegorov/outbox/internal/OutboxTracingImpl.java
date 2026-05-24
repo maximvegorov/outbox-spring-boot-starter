@@ -42,13 +42,12 @@ public class OutboxTracingImpl implements OutboxTracing {
     @Override
     public Runnable restoreContext(@Nullable String tracingContext) {
         if (tracingContext == null) {
-            return () -> {
-            };
+            return NOOP_CLEANUP;
         }
 
         var carrier = fromJson(tracingContext);
         if (carrier.isEmpty()) {
-            return () -> {};
+            return NOOP_CLEANUP;
         }
 
         try {
@@ -65,8 +64,7 @@ public class OutboxTracingImpl implements OutboxTracing {
         } catch (RuntimeException e) {
             log.warn("Failed to restore tracing context", e);
 
-            return () -> {
-            };
+            return NOOP_CLEANUP;
         }
     }
 
