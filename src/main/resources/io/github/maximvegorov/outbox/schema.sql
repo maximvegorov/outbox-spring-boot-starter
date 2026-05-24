@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS transaction_outbox
     created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
     expired_at    TIMESTAMP WITH TIME ZONE,
     processed_at  TIMESTAMP WITH TIME ZONE,
+    tracing_context TEXT,
 
     CONSTRAINT pk_transaction_outbox PRIMARY KEY (id),
     CONSTRAINT ak_transaction_outbox UNIQUE (handler_type, payload_key)

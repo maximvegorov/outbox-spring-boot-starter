@@ -6,10 +6,15 @@ import io.github.maximvegorov.outbox.OutboxHandlerRegistry;
 import io.github.maximvegorov.outbox.OutboxProperties;
 import io.github.maximvegorov.outbox.OutboxService;
 import io.github.maximvegorov.outbox.internal.*;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
@@ -17,15 +22,10 @@ import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfigurati
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.github.maximvegorov.outbox.internal.OutboxMetricsImpl;
-import io.github.maximvegorov.outbox.internal.OutboxMetrics;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -53,15 +53,8 @@ public class OutboxAutoConfiguration {
             @Qualifier(WORKER_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
             OutboxHandlerInvoker invoker,
             OutboxRepository repository,
-            ObjectProvider<OutboxMetrics> metrics) {
-        return new OutboxQueueProcessorImpl(properties, taskExecutor, invoker, repository,
-                metrics.getIfAvailable(() -> OutboxMetrics.NOOP));
-    }
-
-    @Bean
-    @ConditionalOnBean(MeterRegistry.class)
-    public OutboxMetrics outboxMetrics(MeterRegistry meterRegistry) {
-        return new OutboxMetricsImpl(meterRegistry);
+            OutboxObservability observability) {
+        return new OutboxQueueProcessorImpl(properties, taskExecutor, invoker, repository, observability);
     }
 
     @Bean(WORKER_EXECUTOR_BEAN_NAME)
@@ -97,6 +90,29 @@ public class OutboxAutoConfiguration {
     @DependsOn(SCHEMA_INITIALIZER_BEAN_NAME)
     public OutboxRepository outboxRepository(JdbcClient jdbcClient) {
         return new OutboxRepositoryImpl(jdbcClient);
+    }
+
+    @Bean
+    public OutboxObservability outboxObservability(
+            ObjectProvider<OutboxMetrics> metrics,
+            ObjectProvider<OutboxTracing> tracing) {
+        return new OutboxObservabilityImpl(
+                metrics.getIfAvailable(() -> OutboxMetrics.NOOP),
+                tracing.getIfAvailable(() -> OutboxTracing.NOOP));
+    }
+
+    @Bean
+    @ConditionalOnClass(MeterRegistry.class)
+    @ConditionalOnBean(MeterRegistry.class)
+    public OutboxMetrics outboxMetrics(MeterRegistry meterRegistry) {
+        return new OutboxMetricsImpl(meterRegistry);
+    }
+
+    @Bean
+    @ConditionalOnClass(Tracer.class)
+    @ConditionalOnBean(Tracer.class)
+    public OutboxTracing outboxTracing(Tracer tracer, Propagator propagator, ObjectMapper objectMapper) {
+        return new OutboxTracingImpl(tracer, propagator, objectMapper);
     }
 
     @Bean(SCHEMA_INITIALIZER_BEAN_NAME)

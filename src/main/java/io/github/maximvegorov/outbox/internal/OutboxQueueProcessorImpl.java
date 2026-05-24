@@ -20,7 +20,7 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
     private final AsyncTaskExecutor taskExecutor;
     private final OutboxHandlerInvoker invoker;
     private final OutboxRepository repository;
-    private final OutboxMetrics metrics;
+    private final OutboxObservability observability;
 
     @Override
     public void afterPropertiesSet() {
@@ -30,11 +30,13 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
     @NonNull
     @Override
     public OutboxMessage enqueue(String handlerType, String payloadKey, Object payload) {
-        metrics.recordPublished(handlerType);
+        observability.recordPublished(handlerType);
 
         var payloadJson = invoker.toJson(payloadKey, payload);
 
-        return repository.save(handlerType, payloadKey, payloadJson, Instant.now());
+        var tracingContext = observability.captureTracingContext();
+
+        return repository.save(handlerType, payloadKey, payloadJson, Instant.now(), tracingContext);
     }
 
     @Override
@@ -56,9 +58,14 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
 
         return repository.fetchFirstReadyToProcess()
                 .map(message -> {
-                    process(message);
+                    var cleanup = observability.restoreTracingContext(message.tracingContext());
+                    try {
+                        process(message);
 
-                    return message.id();
+                        return message.id();
+                    } finally {
+                        cleanup.run();
+                    }
                 })
                 .orElse(null);
     }
@@ -67,9 +74,14 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
     public Long tryProcessNext(Long prevId) {
         return repository.fetchNextReadyToProcess(prevId)
                 .map(message -> {
-                    process(message);
+                    var cleanup = observability.restoreTracingContext(message.tracingContext());
+                    try {
+                        process(message);
 
-                    return message.id();
+                        return message.id();
+                    } finally {
+                        cleanup.run();
+                    }
                 })
                 .orElse(null);
     }
@@ -87,7 +99,7 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
 
             repository.moveToDone(message.id(), Instant.now());
 
-            metrics.recordProcessed(message.handlerType());
+            observability.recordProcessed(message.handlerType());
         } catch (TemporaryFailureException e) {
             log.error("Temporary failure while processing message with key {}", message.payloadKey(), e);
             processTemporaryFailure(message);
@@ -111,7 +123,7 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
     }
 
     private void moveToError(OutboxMessage message) {
-        metrics.recordError(message.handlerType());
+        observability.recordError(message.handlerType());
         if (!repository.moveToError(message.id(), message.version() + 1)) {
             log.warn("Could not move to error message with key {}", message.payloadKey());
         }

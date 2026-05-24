@@ -20,6 +20,7 @@ public record OutboxMessage(
         Instant createdAt,
         Instant expiredAt,
         Instant processedAt,
+        String tracingContext,
         @NonNull
         OutboxStatus status,
         long version
