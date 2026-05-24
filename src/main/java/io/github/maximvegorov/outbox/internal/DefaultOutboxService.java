@@ -18,6 +18,12 @@ public class DefaultOutboxService implements OutboxService {
         triggerAfterCommit(message);
     }
 
+    @Override
+    public void republish(String handlerType, String payloadKey) {
+        queueProcessor.reenqueue(handlerType, payloadKey)
+                .ifPresent(this::triggerAfterCommit);
+    }
+
     private void triggerAfterCommit(OutboxMessage message) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

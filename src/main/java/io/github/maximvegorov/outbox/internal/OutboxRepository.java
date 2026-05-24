@@ -14,6 +14,9 @@ public interface OutboxRepository {
     @NonNull
     OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing);
 
+    @NonNull
+    Optional<@NonNull OutboxMessage> moveToNew(String handlerType, String payloadKey);
+
     boolean tryMoveToInProgress(Long id, long expectedVersion, Instant expiredAt);
 
     void moveToDone(Long id, Instant processedAt);

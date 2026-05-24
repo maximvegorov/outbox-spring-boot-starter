@@ -11,11 +11,12 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @NullUnmarked
 @Slf4j
 @RequiredArgsConstructor
-public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueueProcessor {
+public class OutboxQueueProcessorImpl implements OutboxQueueProcessor, InitializingBean {
     private final OutboxProperties properties;
     private final AsyncTaskExecutor taskExecutor;
     private final OutboxHandlerInvoker invoker;
@@ -37,6 +38,16 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
         var tracingContext = observability.captureTracingContext();
 
         return repository.save(handlerType, payloadKey, payloadJson, Instant.now(), tracingContext);
+    }
+
+    @NonNull
+    @Override
+    public Optional<@NonNull OutboxMessage> reenqueue(String handlerType, String payloadKey) {
+        var result = repository.moveToNew(handlerType, payloadKey);
+        if (result.isPresent()) {
+            observability.recordPublished(handlerType);
+        }
+        return result;
     }
 
     @Override

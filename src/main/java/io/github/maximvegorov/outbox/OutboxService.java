@@ -5,4 +5,6 @@ import org.jspecify.annotations.NullUnmarked;
 @NullUnmarked
 public interface OutboxService {
     void publish(String handlerType, String payloadKey, Object payload);
+
+    void republish(String handlerType, String payloadKey);
 }

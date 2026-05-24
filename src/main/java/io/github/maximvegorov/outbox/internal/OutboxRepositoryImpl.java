@@ -3,8 +3,8 @@ package io.github.maximvegorov.outbox.internal;
 import io.github.maximvegorov.outbox.OutboxStatus;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -20,7 +20,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
     public void moveErrorToNew() {
         jdbcClient.sql("""
                         update transaction_outbox
-                        set status = :to, version = version + 1
+                        set status = :to, version = version + 1, failed_attempts = 0
                         where status = :from
                         """)
                 .param("to", OutboxStatus.NEW.name())
@@ -55,6 +55,23 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .createdAt(createdAt)
                 .tracingContext(tracing)
                 .build();
+    }
+
+    @NonNull
+    @Override
+    public Optional<@NonNull OutboxMessage> moveToNew(String handlerType, String payloadKey) {
+        return jdbcClient.sql("""
+                        update transaction_outbox
+                        set status = :newStatus, version = version + 1, failed_attempts = 0, expired_at = null
+                        where handler_type = :handlerType and payload_key = :payloadKey and status = :errorStatus
+                        returning *
+                        """)
+                .param("newStatus", OutboxStatus.NEW.name())
+                .param("handlerType", handlerType)
+                .param("payloadKey", payloadKey)
+                .param("errorStatus", OutboxStatus.ERROR.name())
+                .query(Mappers.ROW_MAPPER)
+                .optional();
     }
 
     @Override
