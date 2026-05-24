@@ -53,7 +53,7 @@ class OutboxQueueProcessorImplTest {
     void enqueue_shouldRecordPublishedCaptureTracingAndSave() {
         when(invoker.toJson(any(), any())).thenReturn(TestData.PAYLOAD_JSON);
         when(observability.captureTracingContext()).thenReturn(TestData.TRACING_CONTEXT);
-        when(repository.save(any(), any(), any(), any(), any())).thenReturn(testMessage());
+        when(repository.save(any(), any(), any(), any(), any())).thenReturn(Optional.of(testMessage()));
 
         processor.enqueue(TestData.HANDLER_TYPE, TestData.PAYLOAD_KEY, new Object());
 
