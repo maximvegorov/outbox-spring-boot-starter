@@ -29,7 +29,6 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -44,10 +43,9 @@ import static org.springframework.scheduling.annotation.ScheduledAnnotationBeanP
 @ConditionalOnProperty(prefix = "outbox", name = "enabled", matchIfMissing = true)
 @EnableConfigurationProperties(OutboxProperties.class)
 public class OutboxAutoConfiguration {
-    private static final String SCHEMA_INITIALIZER_BEAN_NAME = "outboxSchemaInitializer";
-
     public static final String WORKER_EXECUTOR_BEAN_NAME = "outboxWorkerExecutor";
     public static final String OUTBOX_SCHEDULER_BEAN_NAME = "outboxScheduler";
+    private static final String SCHEMA_INITIALIZER_BEAN_NAME = "outboxSchemaInitializer";
 
     @Bean
     public OutboxService outboxService(OutboxQueueProcessor processor) {
@@ -156,7 +154,6 @@ public class OutboxAutoConfiguration {
 
     @Bean(OUTBOX_SCHEDULER_BEAN_NAME)
     @ConditionalOnMissingBean(name = OUTBOX_SCHEDULER_BEAN_NAME)
-    @DependsOn(DEFAULT_TASK_SCHEDULER_BEAN_NAME)
     public ThreadPoolTaskScheduler outboxScheduler(
             OutboxProperties outboxProperties,
             ThreadPoolTaskSchedulerBuilder builder) {
