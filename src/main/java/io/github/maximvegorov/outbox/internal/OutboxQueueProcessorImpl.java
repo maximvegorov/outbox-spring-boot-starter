@@ -88,7 +88,7 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
 
     private void process(OutboxMessage message) {
         try {
-            var expiredAt = properties.expiredAtFor(message.handlerType(), Instant.now());
+            var expiredAt = properties.expiredAtFor(message.handlerType(), Instant.now(), message.failedAttempts());
 
             if (!repository.tryMoveToInProgress(message.id(), message.version(), expiredAt)) {
                 log.warn("Message with key {} will be skipped", message.payloadKey());
@@ -113,11 +113,11 @@ public class OutboxQueueProcessorImpl implements InitializingBean, OutboxQueuePr
     }
 
     private void processTemporaryFailure(OutboxMessage message) {
-        var maxRetries = properties.maxRetriesFor(message.handlerType());
-        if (message.retryCount() + 1 < maxRetries) {
-            log.error("Try again later for message with key {}. Remain {} attempts", message.payloadKey(), maxRetries - message.retryCount() - 1);
+        var maxAttempts = properties.maxAttemptsFor(message.handlerType());
+        if (message.failedAttempts() + 1 < maxAttempts) {
+            log.info("Try again later for message with key {}. Remain {} attempts", message.payloadKey(), maxAttempts - message.failedAttempts() - 1);
         } else {
-            log.error("Retry count for message with key {} was exceeded. Will be move to error", message.payloadKey());
+            log.error("Retry count for message with key {} was exceeded. Will be moved to error", message.payloadKey());
             moveToError(message);
         }
     }

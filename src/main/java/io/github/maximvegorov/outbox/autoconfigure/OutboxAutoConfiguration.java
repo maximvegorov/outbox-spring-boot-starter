@@ -40,7 +40,7 @@ public class OutboxAutoConfiguration {
     private static final String SCHEMA_INITIALIZER_BEAN_NAME = "outboxSchemaInitializer";
 
     public static final String WORKER_EXECUTOR_BEAN_NAME = "outboxWorkerExecutor";
-    public static final String POLL_SCHEDULER_BEAN_NAME = "outboxPollScheduler";
+    public static final String OUTBOX_SCHEDULER_BEAN_NAME = "outboxScheduler";
 
     @Bean
     public OutboxService outboxService(OutboxQueueProcessor processor) {
@@ -120,13 +120,13 @@ public class OutboxAutoConfiguration {
         return new OutboxSchemaInitializer(jdbcTemplate);
     }
 
-    @Bean(POLL_SCHEDULER_BEAN_NAME)
-    @ConditionalOnMissingBean(name = POLL_SCHEDULER_BEAN_NAME)
+    @Bean(OUTBOX_SCHEDULER_BEAN_NAME)
+    @ConditionalOnMissingBean(name = OUTBOX_SCHEDULER_BEAN_NAME)
     @DependsOn("taskScheduler")
-    public ThreadPoolTaskScheduler outboxPollScheduler(
+    public ThreadPoolTaskScheduler outboxScheduler(
             OutboxProperties outboxProperties,
             ThreadPoolTaskSchedulerBuilder builder) {
-        var poller = outboxProperties.getPoller();
+        var poller = outboxProperties.getScheduler();
 
         return builder.threadNamePrefix(poller.getThreadNamePrefix())
                 .poolSize(1)
@@ -142,7 +142,7 @@ public class OutboxAutoConfiguration {
 
     @Bean
     public SmartInitializingSingleton outboxPollerScheduler(
-            @Qualifier(POLL_SCHEDULER_BEAN_NAME) ThreadPoolTaskScheduler scheduler,
+            @Qualifier(OUTBOX_SCHEDULER_BEAN_NAME) ThreadPoolTaskScheduler scheduler,
             OutboxProperties properties,
             OutboxQueuePoller poller) {
         return () -> {
@@ -150,6 +150,24 @@ public class OutboxAutoConfiguration {
             var randomShift = ThreadLocalRandom.current().nextLong(0, pollInterval.toNanos());
             var startTime = Instant.now().plusNanos(randomShift);
             scheduler.scheduleWithFixedDelay(poller::poll, startTime, properties.getPollInterval());
+        };
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "outbox.cleaner", name = "enabled", havingValue = "true")
+    public OutboxQueueCleaner outboxQueueCleaner(OutboxProperties properties, OutboxRepository repository) {
+        return new OutboxQueueCleaner(properties, repository);
+    }
+
+    @Bean
+    @ConditionalOnBean(OutboxQueueCleaner.class)
+    public SmartInitializingSingleton outboxCleanerScheduler(
+            @Qualifier(OUTBOX_SCHEDULER_BEAN_NAME) ThreadPoolTaskScheduler scheduler,
+            OutboxProperties properties,
+            OutboxQueueCleaner cleaner) {
+        return () -> {
+            var runInterval = properties.getCleaner().getRunInterval();
+            scheduler.scheduleWithFixedDelay(cleaner::clean, runInterval);
         };
     }
 }

@@ -25,4 +25,6 @@ public interface OutboxRepository {
     Optional<@NonNull OutboxMessage> fetchFirstReadyToProcess();
 
     Optional<@NonNull OutboxMessage> fetchNextReadyToProcess(Long prevId);
+
+    int deleteDoneBefore(Instant processedBefore, int batchSize);
 }

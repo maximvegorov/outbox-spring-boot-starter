@@ -90,7 +90,7 @@ class DefaultOutboxServiceTest {
                     .payload(TestData.PAYLOAD_JSON)
                     .status(OutboxStatus.NEW)
                     .version(TestData.VERSION)
-                    .retryCount(0)
+                    .failedAttempts(0)
                     .createdAt(Instant.now())
                     .build();
         }

@@ -17,6 +17,8 @@
 
     <properties>
         <java.version>21</java.version>
+
+        <argLine/>
     </properties>
 
     <dependencies>

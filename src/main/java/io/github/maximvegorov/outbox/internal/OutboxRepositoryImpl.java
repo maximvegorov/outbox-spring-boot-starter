@@ -32,7 +32,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
     @Override
     public OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing) {
         var id = jdbcClient.sql("""
-                        insert into transaction_outbox (handler_type, payload_key, payload, status, version, retry_count, created_at, tracing_context)
+                        insert into transaction_outbox (handler_type, payload_key, payload, status, version, failed_attempts, created_at, tracing_context)
                         values (:handlerType, :payloadKey, cast(:payload AS jsonb), :status, 1, 0, :createdAt, :tracingContext)
                         returning id
                         """)
@@ -61,7 +61,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
     public boolean tryMoveToInProgress(Long id, long expectedVersion, Instant expiredAt) {
         return jdbcClient.sql("""
                         update transaction_outbox
-                        set status = :status, version = version + 1, retry_count = retry_count + 1, expired_at = :expiredAt
+                        set status = :status, version = version + 1, failed_attempts = failed_attempts + 1, expired_at = :expiredAt
                         where id = :id and version = :version
                         """)
                 .param("status", OutboxStatus.IN_PROGRESS.name())
@@ -131,6 +131,23 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .optional();
     }
 
+    @Override
+    public int deleteDoneBefore(Instant processedBefore, int batchSize) {
+        return jdbcClient.sql("""
+                        delete from transaction_outbox
+                        where id in (
+                            select id from transaction_outbox
+                            where status = :status and processed_at < :processedBefore
+                            order by id
+                            limit :batchSize
+                        )
+                        """)
+                .param("status", OutboxStatus.DONE.name())
+                .param("processedBefore", processedBefore)
+                .param("batchSize", batchSize)
+                .update();
+    }
+
     private static final class Mappers {
         public static final RowMapper<OutboxMessage> ROW_MAPPER = (rs, rowNum) -> {
             var expiredAt = rs.getTimestamp("expired_at");
@@ -141,7 +158,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                     .handlerType(rs.getString("handler_type"))
                     .payloadKey(rs.getString("payload_key"))
                     .payload(rs.getString("payload"))
-                    .retryCount(rs.getInt("retry_count"))
+                    .failedAttempts(rs.getInt("failed_attempts"))
                     .createdAt(rs.getTimestamp("created_at").toInstant())
                     .expiredAt(expiredAt != null ? expiredAt.toInstant() : null)
                     .processedAt(processedAt != null ? processedAt.toInstant() : null)

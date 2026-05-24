@@ -97,7 +97,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
 
         var result = processor.tryProcessFirst(Instant.now());
 
@@ -111,7 +111,7 @@ class OutboxQueueProcessorImplTest {
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(observability.restoreTracingContext(any())).thenReturn(cleanup);
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
         doThrow(new RuntimeException("boom")).when(invoker).invoke(any(), any(), any());
 
         processor.tryProcessFirst(Instant.now());
@@ -133,7 +133,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage(TestData.NEXT_MESSAGE_ID);
         when(repository.fetchNextReadyToProcess(TestData.MESSAGE_ID)).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
 
         var result = processor.tryProcessNext(TestData.MESSAGE_ID);
 
@@ -145,7 +145,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
 
         processor.tryProcessFirst(Instant.now());
 
@@ -159,7 +159,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(false);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
 
         processor.tryProcessFirst(Instant.now());
 
@@ -172,8 +172,8 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
-        when(properties.maxRetriesFor(TestData.HANDLER_TYPE)).thenReturn(TestData.MAX_RETRIES);
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.maxAttemptsFor(TestData.HANDLER_TYPE)).thenReturn(TestData.MAX_RETRIES);
         doThrow(new TemporaryFailureException("timeout")).when(invoker).invoke(any(), any(), any());
 
         processor.tryProcessFirst(Instant.now());
@@ -187,8 +187,8 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage(TestData.MESSAGE_ID, TestData.LAST_RETRY_COUNT);
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
-        when(properties.maxRetriesFor(TestData.HANDLER_TYPE)).thenReturn(TestData.MAX_RETRIES);
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.maxAttemptsFor(TestData.HANDLER_TYPE)).thenReturn(TestData.MAX_RETRIES);
         when(repository.moveToError(any(), anyLong())).thenReturn(true);
         doThrow(new TemporaryFailureException("timeout")).when(invoker).invoke(any(), any(), any());
 
@@ -203,7 +203,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
         when(repository.moveToError(any(), anyLong())).thenReturn(true);
         doThrow(new RuntimeException("unexpected")).when(invoker).invoke(any(), any(), any());
 
@@ -218,7 +218,7 @@ class OutboxQueueProcessorImplTest {
         var message = testMessage();
         when(repository.fetchFirstReadyToProcess()).thenReturn(Optional.of(message));
         when(repository.tryMoveToInProgress(any(), anyLong(), any())).thenReturn(true);
-        when(properties.expiredAtFor(any(), any())).thenReturn(Instant.now().plusSeconds(30));
+        when(properties.expiredAtFor(any(), any(), anyInt())).thenReturn(Instant.now().plusSeconds(30));
         when(repository.moveToError(any(), anyLong())).thenReturn(true);
         doThrow(new InterruptedException()).when(invoker).invoke(any(), any(), any());
 
@@ -254,7 +254,7 @@ class OutboxQueueProcessorImplTest {
                     .payload(TestData.PAYLOAD_JSON)
                     .status(OutboxStatus.NEW)
                     .version(TestData.VERSION)
-                    .retryCount(retryCount)
+                    .failedAttempts(retryCount)
                     .createdAt(Instant.now())
                     .build();
         }
