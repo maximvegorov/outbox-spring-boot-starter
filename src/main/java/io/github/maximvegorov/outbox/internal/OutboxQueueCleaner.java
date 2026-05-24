@@ -13,7 +13,7 @@ public class OutboxQueueCleaner {
     private final OutboxRepository repository;
 
     public void clean() {
-        log.debug("Start cleaning outdated messages");
+        log.info("Start cleaning outdated messages");
         try {
             var config = properties.getCleaner();
             var processedBefore = Instant.now().minus(config.getRetentionPeriod());
