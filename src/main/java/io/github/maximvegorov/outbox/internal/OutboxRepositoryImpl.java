@@ -76,7 +76,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
         jdbcClient.sql("""
                         update transaction_outbox
                         set status = :status, version = version + 1, processed_at = :processedAt
-                        where id = :id
+                        where id = :id and status <> :status
                         """)
                 .param("status", OutboxStatus.DONE.name())
                 .param("processedAt", processedAt)
