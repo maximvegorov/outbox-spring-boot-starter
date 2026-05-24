@@ -3,6 +3,7 @@ package io.github.maximvegorov.outbox.internal;
 import io.github.maximvegorov.outbox.OutboxStatus;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullUnmarked;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -29,10 +30,10 @@ public class OutboxRepositoryImpl implements OutboxRepository {
 
     @NonNull
     @Override
-    public OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt) {
+    public OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing) {
         var id = jdbcClient.sql("""
-                        insert into transaction_outbox (handler_type, payload_key, payload, status, version, retry_count, created_at)
-                        values (:handlerType, :payloadKey, cast(:payload AS jsonb), :status, 1, 0, :createdAt)
+                        insert into transaction_outbox (handler_type, payload_key, payload, status, version, retry_count, created_at, tracing_context)
+                        values (:handlerType, :payloadKey, cast(:payload AS jsonb), :status, 1, 0, :createdAt, :tracingContext)
                         returning id
                         """)
                 .param("handlerType", handlerType)
@@ -40,6 +41,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .param("payload", payloadJson)
                 .param("status", OutboxStatus.NEW.name())
                 .param("createdAt", createdAt)
+                .param("tracingContext", tracing)
                 .query(Long.class)
                 .single();
 
@@ -51,6 +53,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .status(OutboxStatus.NEW)
                 .version(1)
                 .createdAt(createdAt)
+                .tracingContext(tracing)
                 .build();
     }
 
@@ -142,6 +145,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                     .createdAt(rs.getTimestamp("created_at").toInstant())
                     .expiredAt(expiredAt != null ? expiredAt.toInstant() : null)
                     .processedAt(processedAt != null ? processedAt.toInstant() : null)
+                    .tracingContext(rs.getString("tracing_context"))
                     .status(OutboxStatus.valueOf(rs.getString("status")))
                     .version(rs.getLong("version"))
                     .build();

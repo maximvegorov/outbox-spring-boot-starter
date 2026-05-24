@@ -1,6 +1,7 @@
 package io.github.maximvegorov.outbox.internal;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullUnmarked;
 
 import java.time.Instant;
@@ -11,7 +12,7 @@ public interface OutboxRepository {
     void moveErrorToNew();
 
     @NonNull
-    OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt);
+    OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing);
 
     boolean tryMoveToInProgress(Long id, long expectedVersion, Instant expiredAt);
 
