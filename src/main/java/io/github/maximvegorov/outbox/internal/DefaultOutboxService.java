@@ -13,6 +13,9 @@ public class DefaultOutboxService implements OutboxService {
 
     @Override
     public void publish(String handlerType, String payloadKey, Object payload) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Cannot publish outside active transaction");
+        }
         var message = queueProcessor.enqueue(handlerType, payloadKey, payload);
 
         triggerAfterCommit(message);

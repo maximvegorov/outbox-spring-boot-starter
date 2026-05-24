@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant;
 
 import static io.github.maximvegorov.outbox.internal.DefaultOutboxServiceTest.TestData.testMessage;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -30,22 +31,21 @@ class DefaultOutboxServiceTest {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.clearSynchronization();
         }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     @Test
-    void publish_whenNoActiveTransaction_shouldProcessAsyncImmediately() {
-        var message = testMessage();
-        when(queueProcessor.enqueue(TestData.HANDLER_TYPE, TestData.PAYLOAD_KEY, TestData.PAYLOAD)).thenReturn(message);
+    void publish_whenNoActiveTransaction_shouldThrowIllegalStateException() {
+        assertThatThrownBy(() -> service.publish(TestData.HANDLER_TYPE, TestData.PAYLOAD_KEY, TestData.PAYLOAD))
+                .isInstanceOf(IllegalStateException.class);
 
-        service.publish(TestData.HANDLER_TYPE, TestData.PAYLOAD_KEY, TestData.PAYLOAD);
-
-        verify(queueProcessor).enqueue(TestData.HANDLER_TYPE, TestData.PAYLOAD_KEY, TestData.PAYLOAD);
-        verify(queueProcessor).tryProcessAsync(message);
+        verify(queueProcessor, never()).enqueue(any(), any(), any());
     }
 
     @Test
     void publish_whenActiveTransaction_shouldNotProcessBeforeCommit() {
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         var message = testMessage();
         when(queueProcessor.enqueue(any(), any(), any())).thenReturn(message);
 
@@ -58,6 +58,7 @@ class DefaultOutboxServiceTest {
     @Test
     void publish_whenActiveTransaction_shouldProcessAsyncAfterCommit() {
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         var message = testMessage();
         when(queueProcessor.enqueue(any(), any(), any())).thenReturn(message);
 
@@ -66,7 +67,7 @@ class DefaultOutboxServiceTest {
         var syncCaptor = ArgumentCaptor.forClass(TransactionSynchronization.class);
         verify(queueProcessor, never()).tryProcessAsync(any());
 
-        syncCaptor.getAllValues(); // just to confirm no premature calls
+        syncCaptor.getAllValues();
         TransactionSynchronizationManager.getSynchronizations()
                 .forEach(TransactionSynchronization::afterCommit);
 
