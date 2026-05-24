@@ -6,8 +6,12 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.SqlTypeValue;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.sql.JDBCType;
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -46,8 +50,8 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .param("payloadKey", payloadKey)
                 .param("payload", payloadJson)
                 .param("status", OutboxStatus.NEW.name())
-                .param("createdAt", createdAt)
-                .param("tracingContext", tracingContext)
+                .param("createdAt", Timestamp.from(createdAt))
+                .param("tracingContext", tracingContext, Types.VARCHAR)
                 .query(Long.class)
                 .optional()
                 .map(id -> OutboxMessage.builder()
@@ -87,7 +91,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                         where id = :id and version = :version
                         """)
                 .param("status", OutboxStatus.IN_PROGRESS.name())
-                .param("expiredAt", expiredAt)
+                .param("expiredAt", Timestamp.from(expiredAt))
                 .param("id", id)
                 .param("version", expectedVersion)
                 .update() == 1;
@@ -101,7 +105,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                         where id = :id and status <> :status
                         """)
                 .param("status", OutboxStatus.DONE.name())
-                .param("processedAt", processedAt)
+                .param("processedAt", Timestamp.from(processedAt))
                 .param("id", id)
                 .update();
     }
@@ -128,7 +132,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                         """)
                 .param("to", OutboxStatus.NEW.name())
                 .param("from", OutboxStatus.IN_PROGRESS.name())
-                .param("now", now)
+                .param("now", Timestamp.from(now))
                 .update();
     }
 
@@ -165,7 +169,7 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                         )
                         """)
                 .param("status", OutboxStatus.DONE.name())
-                .param("processedBefore", processedBefore)
+                .param("processedBefore", Timestamp.from(processedBefore))
                 .param("batchSize", batchSize)
                 .update();
     }
