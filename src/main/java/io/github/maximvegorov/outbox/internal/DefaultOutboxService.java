@@ -12,16 +12,24 @@ public class DefaultOutboxService implements OutboxService {
     private final OutboxQueueProcessor queueProcessor;
 
     @Override
-    public void publish(String handlerType, String payloadKey, Object payload) {
-        var message = queueProcessor.enqueue(handlerType, payloadKey, payload);
+    public boolean publish(String handlerType, String payloadKey, Object payload) {
+        return queueProcessor.enqueue(handlerType, payloadKey, payload)
+                .map(message -> {
+                    triggerAfterCommit(message);
+                    return true;
+                })
+                .orElse(false);
 
-        triggerAfterCommit(message);
     }
 
     @Override
-    public void republish(String handlerType, String payloadKey) {
-        queueProcessor.reenqueue(handlerType, payloadKey)
-                .ifPresent(this::triggerAfterCommit);
+    public boolean republish(String handlerType, String payloadKey) {
+        return queueProcessor.reenqueue(handlerType, payloadKey)
+                .map(message -> {
+                    triggerAfterCommit(message);
+                    return true;
+                })
+                .orElse(false);
     }
 
     private void triggerAfterCommit(OutboxMessage message) {

@@ -10,7 +10,7 @@ import java.util.Optional;
 @NullUnmarked
 public interface OutboxQueueProcessor {
     @NonNull
-    OutboxMessage enqueue(String handlerType, String payloadKey, Object payload);
+    Optional<@NonNull OutboxMessage> enqueue(String handlerType, String payloadKey, Object payload);
 
     @NonNull
     Optional<@NonNull OutboxMessage> reenqueue(String handlerType, String payloadKey);

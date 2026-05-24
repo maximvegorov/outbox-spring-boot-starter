@@ -30,14 +30,16 @@ public class OutboxQueueProcessorImpl implements OutboxQueueProcessor, Initializ
 
     @NonNull
     @Override
-    public OutboxMessage enqueue(String handlerType, String payloadKey, Object payload) {
-        observability.recordPublished(handlerType);
-
+    public Optional<@NonNull OutboxMessage> enqueue(String handlerType, String payloadKey, Object payload) {
         var payloadJson = invoker.toJson(payloadKey, payload);
 
         var tracingContext = observability.captureTracingContext();
 
-        return repository.save(handlerType, payloadKey, payloadJson, Instant.now(), tracingContext);
+        var message = repository.save(handlerType, payloadKey, payloadJson, Instant.now(), tracingContext);
+        if (message.isPresent()) {
+            observability.recordPublished(handlerType);
+        }
+        return message;
     }
 
     @NonNull

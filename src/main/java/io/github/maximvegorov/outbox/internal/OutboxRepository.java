@@ -12,7 +12,12 @@ public interface OutboxRepository {
     void moveErrorToNew();
 
     @NonNull
-    OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing);
+    Optional<@NonNull OutboxMessage> save(
+            String handlerType,
+            String payloadKey,
+            String payloadJson,
+            Instant createdAt,
+            @Nullable String tracingContext);
 
     @NonNull
     Optional<@NonNull OutboxMessage> moveToNew(String handlerType, String payloadKey);

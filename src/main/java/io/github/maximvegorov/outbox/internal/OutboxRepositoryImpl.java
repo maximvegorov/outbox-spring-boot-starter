@@ -30,10 +30,16 @@ public class OutboxRepositoryImpl implements OutboxRepository {
 
     @NonNull
     @Override
-    public OutboxMessage save(String handlerType, String payloadKey, String payloadJson, Instant createdAt, @Nullable String tracing) {
-        var id = jdbcClient.sql("""
+    public Optional<@NonNull OutboxMessage> save(
+            String handlerType,
+            String payloadKey,
+            String payloadJson,
+            Instant createdAt,
+            @Nullable String tracingContext) {
+        return jdbcClient.sql("""
                         insert into transaction_outbox (handler_type, payload_key, payload, status, version, failed_attempts, created_at, tracing_context)
                         values (:handlerType, :payloadKey, cast(:payload AS jsonb), :status, 1, 0, :createdAt, :tracingContext)
+                        on conflict (handler_type, payload_key) do nothing
                         returning id
                         """)
                 .param("handlerType", handlerType)
@@ -41,20 +47,19 @@ public class OutboxRepositoryImpl implements OutboxRepository {
                 .param("payload", payloadJson)
                 .param("status", OutboxStatus.NEW.name())
                 .param("createdAt", createdAt)
-                .param("tracingContext", tracing)
+                .param("tracingContext", tracingContext)
                 .query(Long.class)
-                .single();
-
-        return OutboxMessage.builder()
-                .id(id)
-                .handlerType(handlerType)
-                .payloadKey(payloadKey)
-                .payload(payloadJson)
-                .status(OutboxStatus.NEW)
-                .version(1)
-                .createdAt(createdAt)
-                .tracingContext(tracing)
-                .build();
+                .optional()
+                .map(id -> OutboxMessage.builder()
+                        .id(id)
+                        .handlerType(handlerType)
+                        .payloadKey(payloadKey)
+                        .payload(payloadJson)
+                        .status(OutboxStatus.NEW)
+                        .version(1)
+                        .createdAt(createdAt)
+                        .tracingContext(tracingContext)
+                        .build());
     }
 
     @NonNull
